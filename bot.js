@@ -15,7 +15,6 @@ const bot = new TelegramBot(token, { polling: true });
 
 // ===== CONFIG =====
 const API_URL = "https://indiansmmprovider.in/api/v2";
-const ADMIN_ID = 6034840006;
 
 // ===== DATA =====
 let users = {};
@@ -27,6 +26,7 @@ try {
 
 let userState = {};
 let cachedServices = [];
+let userPage = {};
 
 // ===== SAVE =====
 function saveUsers() {
@@ -44,7 +44,7 @@ function getPrice(rate) {
     return parseFloat(rate) * 1.4;
 }
 
-// ===== API =====
+// ===== LOAD SERVICES =====
 async function loadServices() {
     try {
         const res = await axios.post(API_URL, null, {
@@ -52,81 +52,144 @@ async function loadServices() {
         });
 
         cachedServices = res.data.slice(0, 50);
-        console.log("✅ Services Loaded:", cachedServices.length);
+        console.log("✅ Services loaded:", cachedServices.length);
     } catch (e) {
-        console.log("API ERROR", e.message);
+        console.log("API ERROR:", e.message);
     }
+}
+
+// ===== SHOW PAGE =====
+function showPage(chatId) {
+    let page = userPage[chatId] || 0;
+    let start = page * 10;
+    let services = cachedServices.slice(start, start + 10);
+
+    if (!services.length) {
+        return bot.sendMessage(chatId, "❌ No services found");
+    }
+
+    let msg = `📦 Services (Page ${page + 1})\n\n`;
+
+    services.forEach(s => {
+        msg += `🆔 ${s.service}\n`;
+        msg += `${s.name || "No Name"}\n`;
+        msg += `💰 ₹${getPrice(s.rate).toFixed(2)} /1000\n`;
+        msg += `📉 Min: ${s.min} | 📈 Max: ${s.max}\n\n`;
+    });
+
+    msg += `\n👉 Use: /buy SERVICE_ID\n`;
+    msg += `➡️ /next | ⬅️ /back`;
+
+    bot.sendMessage(chatId, msg);
 }
 
 // ===== START =====
 bot.onText(/\/start/, async (msg) => {
     await loadServices();
 
-    bot.sendMessage(msg.chat.id, "🚀 RAHI PANEL", {
-        reply_markup: {
-            keyboard: [
-                ["📦 Services", "🔍 Search"],
-                ["👛 Balance"]
-            ],
-            resize_keyboard: true
-        }
-    });
+    bot.sendMessage(msg.chat.id,
+        "🚀 RAHI PANEL\n\nUse menu:\n📦 Services\n👛 Balance"
+    );
 });
 
-// ===== SHOW SERVICES =====
-function showServices(chatId, page = 0, list = cachedServices) {
-    let start = page * 10;
-    let services = list.slice(start, start + 10);
+// ===== COMMANDS =====
 
-    let buttons = services.map(s => ([{
-        text: `${s.name || "Service"} - ₹${getPrice(s.rate).toFixed(2)}`,
-        callback_data: `service_${s.service}`
-    }]));
+// SERVICES
+bot.onText(/📦 Services/, async (msg) => {
+    if (!cachedServices.length) await loadServices();
 
-    let nav = [];
-    if (page > 0) nav.push({ text: "⬅️ Back", callback_data: `page_${page - 1}` });
-    if ((page + 1) * 10 < list.length) nav.push({ text: "➡️ Next", callback_data: `page_${page + 1}` });
+    userPage[msg.chat.id] = 0;
+    showPage(msg.chat.id);
+});
 
-    if (nav.length) buttons.push(nav);
+// NEXT
+bot.onText(/\/next/, (msg) => {
+    let page = userPage[msg.chat.id] || 0;
 
-    bot.sendMessage(chatId, "📦 Select Service:", {
-        reply_markup: { inline_keyboard: buttons }
-    });
-}
-
-// ===== BUTTON HANDLER =====
-bot.on('callback_query', async (q) => {
-    const chatId = q.message.chat.id;
-    const data = q.data;
-
-    // PAGE
-    if (data.startsWith("page_")) {
-        let page = parseInt(data.split("_")[1]);
-        return showServices(chatId, page);
+    if ((page + 1) * 10 >= cachedServices.length) {
+        return bot.sendMessage(msg.chat.id, "❌ No more pages");
     }
 
-    // SELECT SERVICE
-    if (data.startsWith("service_")) {
-        let id = data.split("_")[1];
-        let s = cachedServices.find(x => x.service == id);
+    userPage[msg.chat.id] = page + 1;
+    showPage(msg.chat.id);
+});
 
-        if (!s) return bot.sendMessage(chatId, "❌ Service not found");
+// BACK
+bot.onText(/\/back/, (msg) => {
+    let page = userPage[msg.chat.id] || 0;
 
-        userState[chatId] = { step: "link", service: s };
+    if (page === 0) {
+        return bot.sendMessage(msg.chat.id, "❌ Already first page");
+    }
+
+    userPage[msg.chat.id] = page - 1;
+    showPage(msg.chat.id);
+});
+
+// BUY
+bot.onText(/\/buy (.+)/, (msg, match) => {
+    let id = parseInt(match[1]);
+
+    let service = cachedServices.find(s => s.service == id);
+
+    if (!service) {
+        return bot.sendMessage(msg.chat.id, "❌ Invalid service ID");
+    }
+
+    userState[msg.chat.id] = {
+        step: "link",
+        service: service
+    };
+
+    bot.sendMessage(msg.chat.id,
+        `📦 ${service.name}\nSend link:`
+    );
+});
+
+// MESSAGE FLOW
+bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const text = msg.text;
+
+    if (text === "👛 Balance") {
+        let user = getUser(chatId);
+        return bot.sendMessage(chatId, `💰 ₹${user.balance}`);
+    }
+
+    let state = userState[chatId];
+
+    if (!state) return;
+
+    // LINK
+    if (state.step === "link") {
+        state.link = text;
+        state.step = "qty";
+        return bot.sendMessage(chatId, "Enter quantity:");
+    }
+
+    // QTY
+    if (state.step === "qty") {
+        let qty = parseInt(text);
+        if (isNaN(qty)) return bot.sendMessage(chatId, "❌ Invalid");
+
+        let s = state.service;
+        let total = (getPrice(s.rate) / 1000) * qty;
+
+        state.qty = qty;
+        state.total = total;
+        state.step = "confirm";
 
         return bot.sendMessage(chatId,
-            `📦 ${s.name}
-💰 ₹${getPrice(s.rate).toFixed(2)} / 1000
-📉 Min: ${s.min}
-📈 Max: ${s.max}
-
-🔗 Send link:`
+            `Confirm Order\n\n${s.name}\nQty: ${qty}\nTotal: ₹${total.toFixed(2)}\n\nType YES to confirm`
         );
     }
 
     // CONFIRM
-    if (data === "confirm") {
-        let state = userState[chatId];
+    if (state.step === "confirm") {
+        if (text.toLowerCase() !== "yes") {
+            delete userState[chatId];
+            return bot.sendMessage(chatId, "❌ Cancelled");
+        }
 
         let res = await axios.post(API_URL, null, {
             params: {
@@ -146,83 +209,8 @@ bot.on('callback_query', async (q) => {
         user.balance -= state.total;
         saveUsers();
 
+        bot.sendMessage(chatId, `✅ Order placed\nID: ${res.data.order}`);
         delete userState[chatId];
-
-        return bot.sendMessage(chatId, `✅ Order placed\nID: ${res.data.order}`);
-    }
-
-    if (data === "cancel") {
-        delete userState[chatId];
-        return bot.sendMessage(chatId, "❌ Cancelled");
-    }
-});
-
-// ===== MESSAGE FLOW =====
-bot.on('message', async (msg) => {
-    const chatId = msg.chat.id;
-    const text = msg.text;
-
-    if (text === "📦 Services") {
-        return showServices(chatId, 0);
-    }
-
-    if (text === "👛 Balance") {
-        let user = getUser(chatId);
-        return bot.sendMessage(chatId, `💰 ₹${user.balance}`);
-    }
-
-    if (text === "🔍 Search") {
-        userState[chatId] = { step: "search" };
-        return bot.sendMessage(chatId, "Enter service name:");
-    }
-
-    let state = userState[chatId];
-
-    // SEARCH
-    if (state?.step === "search") {
-        let results = cachedServices.filter(s =>
-            s.name?.toLowerCase().includes(text.toLowerCase())
-        );
-
-        if (!results.length) return bot.sendMessage(chatId, "❌ No results");
-
-        return showServices(chatId, 0, results);
-    }
-
-    // LINK
-    if (state?.step === "link") {
-        state.link = text;
-        state.step = "qty";
-        return bot.sendMessage(chatId, "Enter quantity:");
-    }
-
-    // QTY
-    if (state?.step === "qty") {
-        let qty = parseInt(text);
-        if (isNaN(qty)) return bot.sendMessage(chatId, "❌ Invalid");
-
-        let s = state.service;
-        let total = (getPrice(s.rate) / 1000) * qty;
-
-        state.qty = qty;
-        state.total = total;
-        state.step = "confirm";
-
-        return bot.sendMessage(chatId,
-            `Confirm Order
-
-${s.name}
-Qty: ${qty}
-Total: ₹${total.toFixed(2)}`,
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: "✅ Confirm", callback_data: "confirm" }],
-                        [{ text: "❌ Cancel", callback_data: "cancel" }]
-                    ]
-                }
-            }
-        );
     }
 });
 
