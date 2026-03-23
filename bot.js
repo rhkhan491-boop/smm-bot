@@ -5,10 +5,15 @@ const QRCode = require('qrcode');
 
 // ===== ENV =====
 const token = process.env.BOT_TOKEN;
-const API_KEY = process.env.TPx2ymBmiN3kAv4zWMMEJKralxz55Zp0uuI1EOCWvGI9SwV9NFEQff55vzCTKhZZ;
+const API_KEY = process.env.lMOReIsLLf4ENq3VlgsR7jaSTQBcasUBPqsrW9v9lvQigPbEPwss8STR2BcMthKZ;
 
 if (!token) {
     console.log("❌ BOT TOKEN MISSING");
+    process.exit(1);
+}
+
+if (!API_KEY) {
+    console.log("❌ API KEY MISSING");
     process.exit(1);
 }
 
@@ -31,6 +36,9 @@ try {
 
 let userState = {};
 
+// ===== FOLDER FIX =====
+if (!fs.existsSync('./qrs')) fs.mkdirSync('./qrs');
+
 // ===== FUNCTIONS =====
 function saveUsers() {
     fs.writeFileSync('./users.json', JSON.stringify(users, null, 2));
@@ -45,24 +53,33 @@ function getPrice(rate) {
     return parseFloat(rate) * 1.4;
 }
 
+// ===== FIXED API REQUEST =====
 async function apiRequest(params) {
     try {
+        const finalParams = {
+            key: API_KEY,
+            ...params
+        };
+
+        console.log("📤 Sending:", finalParams);
+
         const res = await axios.post(
             API_URL,
-            new URLSearchParams(params),
+            new URLSearchParams(finalParams),
             {
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded"
-                }
+                },
+                timeout: 15000
             }
         );
 
-        console.log("API RESPONSE:", res.data);
+        console.log("📥 Response:", res.data);
 
         return res.data;
 
     } catch (err) {
-        console.log("API ERROR:", err.response?.data || err.message);
+        console.log("❌ API ERROR:", err.response?.data || err.message);
         return null;
     }
 }
@@ -114,8 +131,6 @@ bot.on('message', async (msg) => {
         let upiLink = `upi://pay?pa=${UPI_ID}&pn=RAHI&am=${amount}&cu=INR`;
         let filePath = `./qrs/${msg.chat.id}.png`;
 
-        if (!fs.existsSync('./qrs')) fs.mkdirSync('./qrs');
-
         await QRCode.toFile(filePath, upiLink);
 
         state.step = "add_payment";
@@ -148,16 +163,17 @@ bot.on('message', async (msg) => {
 bot.on('message', async (msg) => {
     if (msg.text === "📦 Services") {
         let services = await apiRequest({
-            key: API_KEY,
             action: "services"
         });
 
-        if (!services) return bot.sendMessage(msg.chat.id, "❌ API Error");
+        if (!services || services.error) {
+            return bot.sendMessage(msg.chat.id, "❌ API Error");
+        }
 
         let message = "📦 Services (Top 20):\n\n";
 
         services.slice(0, 20).forEach(s => {
-            message += `🆔 ${s.service}\n${s.name}\n₹${getPrice(s.rate).toFixed(2)}\n\n`;
+            message += `🆔 ${s.service}\n${s.name || "No Name"}\n₹${getPrice(s.rate).toFixed(2)}\n\n`;
         });
 
         message += "👉 /buy ID";
@@ -171,11 +187,14 @@ bot.onText(/\/search (.+)/, async (msg, match) => {
     let query = match[1].toLowerCase();
 
     let services = await apiRequest({
-        key: API_KEY,
         action: "services"
     });
 
-    let results = services.filter(s => s.name.toLowerCase().includes(query)).slice(0, 10);
+    if (!services || services.error) {
+        return bot.sendMessage(msg.chat.id, "❌ API Error");
+    }
+
+    let results = services.filter(s => s.name?.toLowerCase().includes(query)).slice(0, 10);
 
     if (results.length === 0) return bot.sendMessage(msg.chat.id, "❌ No results");
 
@@ -212,7 +231,7 @@ bot.on('message', async (msg) => {
         let qty = parseInt(msg.text);
         if (isNaN(qty)) return bot.sendMessage(msg.chat.id, "❌ Invalid");
 
-        let services = await apiRequest({ key: API_KEY, action: "services" });
+        let services = await apiRequest({ action: "services" });
         let s = services.find(x => x.service == state.service);
 
         if (!s) return bot.sendMessage(msg.chat.id, "❌ Service not found");
@@ -249,7 +268,6 @@ bot.on('callback_query', async (q) => {
 
     if (q.data === "confirm") {
         let res = await apiRequest({
-            key: API_KEY,
             action: "add",
             service: state.service,
             link: state.link,
@@ -257,7 +275,6 @@ bot.on('callback_query', async (q) => {
         });
 
         if (!res || res.error) {
-            console.log("ORDER ERROR:", res);
             return bot.sendMessage(chatId, "❌ Order failed");
         }
 
@@ -284,3 +301,5 @@ bot.on('callback_query', async (q) => {
         bot.sendMessage(id, `✅ ₹${amount} added`);
     }
 });
+
+console.log("✅ Bot running...");
