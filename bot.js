@@ -1,5 +1,9 @@
 const TelegramBot = require('node-telegram-bot-api');
-const fs = require('fs');
+const fs = require("fs");
+
+if (!fs.existsSync("./qrs")) {
+    fs.mkdirSync("./qrs");
+}
 const axios = require('axios');
 const QRCode = require('qrcode');
 
