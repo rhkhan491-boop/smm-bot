@@ -5,7 +5,7 @@ const QRCode = require('qrcode');
 
 // ===== ENV =====
 const token = process.env.BOT_TOKEN;
-const API_KEY = process.env.XhOzeKbAWU0IuMHkV5wzYNHSJjLYIltAhGUAmbsiqhs1bjKym6geDscASuiznJ0h;
+const API_KEY = process.env.TPx2ymBmiN3kAv4zWMMEJKralxz55Zp0uuI1EOCWvGI9SwV9NFEQff55vzCTKhZZ;
 
 if (!token) {
     console.log("❌ BOT TOKEN MISSING");
