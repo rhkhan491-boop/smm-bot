@@ -3,16 +3,16 @@ const fs = require('fs');
 const axios = require('axios');
 const QRCode = require('qrcode');
 
-const token = "8708018037:AAGZDIkb2PWa0KIUyneW4Gn0Rt17B9oHVsM";
+const token = process.env.8708018037:AAGZDIkb2PWa0KIUyneW4Gn0Rt17B9oHVsM;
 const bot = new TelegramBot(token, { polling: true });
 
 // ===== CONFIG =====
-const ADMIN_ID = 6034840006;
+const ADMIN_ID = process.env.6034840006;
 const SUPPORT_USERNAME = "@not_your_rahi";
 const UPI_ID = "rahikhann@fam";
 
 const API_URL = "https://indiansmmprovider.in/api/v2";
-const API_KEY = "Z5PUyuvcR5AhKoMA9dRo4VHIVjc6eaVn7cnzqQbJD59uKScIy3yw5GF18i8IY02y";
+const API_KEY = process.env.Z5PUyuvcR5AhKoMA9dRo4VHIVjc6eaVn7cnzqQbJD59uKScIy3yw5GF18i8IY02y;
 
 // ===== DATA =====
 let users = {};
