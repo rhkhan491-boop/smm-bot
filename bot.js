@@ -155,7 +155,7 @@ bot.on('message', async (msg) => {
             let msgText = "📦 Top Services:\n\n";
 
             services.slice(0, 20).forEach(s => {
-                msgText += `🆔 ${s.service}\n₹${getPrice(s.rate).toFixed(2)}\n\n`;
+                msgText += `🆔 ${s.service}\n${s.name}\n₹${getPrice(s.rate).toFixed(2)}\n\n`;
             });
 
             return bot.sendMessage(chatId, msgText);
