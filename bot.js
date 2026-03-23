@@ -3,7 +3,7 @@ const axios = require('axios');
 
 // ===== ENV CONFIG =====
 const token = process.env.8708018037:AAFaa6lYSM3fhVH0P701AcXMixpJhueuZq4;
-const API_KEY = process.env.Z5PUyuvcR5AhKoMA9dRo4VHIVjc6eaVn7cnzqQbJD59uKScIy3yw5GF18i8IY02y;
+const API_KEY = process.env.IHTVNZILGtLel3e6Z5RrTB05RVNl3DBagsCEs6XqgFjFgCQQAw6de7tRb2BCGgt1;
 const ADMIN_ID = process.env.6034840006;
 
 const API_URL = "https://indiansmmprovider.in/api/v2";
