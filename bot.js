@@ -4,7 +4,7 @@ const axios = require('axios');
 const QRCode = require('qrcode');
 
 // ===== ENV =====
-const token = process.env.8708018037:AAEISIlTZuabjAf1NuBYtrZ_1SNWi9xcEXQ;
+const token = process.env.BOT_TOKEN;
 if (!token) {
     console.error("❌ BOT_TOKEN missing");
     process.exit(1);
@@ -25,7 +25,7 @@ const SUPPORT_USERNAME = "@not_your_rahi";
 const UPI_ID = "rahikhann@fam";
 
 const API_URL = "https://indiansmmprovider.in/api/v2";
-const API_KEY = process.env.API_KEY || " yNjnx92pGXgVBDYfd58PgC1BV5dCbHawdqosI84GsRucBZr18F4YyRpcDLhUxm5o";
+const API_KEY = process.env.API_KEY || "yNjnx92pGXgVBDYfd58PgC1BV5dCbHawdqosI84GsRucBZr18F4YyRpcDLhUxm5o";
 
 // ===== FOLDERS =====
 if (!fs.existsSync('./qrs')) fs.mkdirSync('./qrs');
