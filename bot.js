@@ -47,8 +47,20 @@ function getPrice(rate) {
 
 async function apiRequest(params) {
     try {
-        const res = await axios.post(API_URL, null, { params });
+        const res = await axios.post(
+            API_URL,
+            new URLSearchParams(params),
+            {
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+            }
+        );
+
+        console.log("API RESPONSE:", res.data);
+
         return res.data;
+
     } catch (err) {
         console.log("API ERROR:", err.response?.data || err.message);
         return null;
